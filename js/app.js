@@ -128,6 +128,12 @@ async function init() {
   const pref = localStorage.getItem(BACKEND_PREF_KEY);
 
   if (pref === 'drive') {
+    // Fast path: cached token is still valid — render immediately, skip GIS wait.
+    if (driveHasCachedToken()) {
+      setActiveBackend(DriveBackend);
+      await loadAndRender();
+      return;
+    }
     const gisReady = await _waitForGis();
     const state = gisReady ? await driveRestore() : 'needs-signin';
     if (state === 'granted') { setActiveBackend(DriveBackend); await loadAndRender(); return; }

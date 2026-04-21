@@ -156,16 +156,21 @@ async function _multipartUpload(filename, body, fileId) {
 
 // Try silent auth (no popup). Returns 'granted' | 'needs-signin' | 'none'.
 // 'none' means GIS script isn't loaded; 'needs-signin' means a user gesture is required.
+// Synchronous check — used by init() to skip the GIS wait entirely on fast reloads.
+function driveHasCachedToken() {
+  return !!_accessToken && Date.now() < _tokenExpiry;
+}
+
 async function driveRestore() {
-  // Cached token still valid → skip Google entirely, no popup.
-  if (_accessToken && Date.now() < _tokenExpiry) return 'granted';
+  if (driveHasCachedToken()) return 'granted';
 
   if (!window.google?.accounts?.oauth2) return 'none';
   const prev = localStorage.getItem('bm_drive_last_signin');
   if (!prev) return 'needs-signin';
   const tok = await _requestToken(false);
   if (!tok) return 'needs-signin';
-  if (!_userEmail) await _loadUserEmail();
+  // Email is cosmetic — fetch in background so it doesn't block rendering.
+  if (!_userEmail) _loadUserEmail();
   return 'granted';
 }
 

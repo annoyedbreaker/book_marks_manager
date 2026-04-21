@@ -9,6 +9,23 @@ async function openModal() {
   document.getElementById('modal-title').textContent = 'Add Bookmark';
   document.getElementById('btn-submit').textContent = 'Save Bookmark';
   populateCatSelect();
+
+  // Pre-select the currently filtered category so new bookmarks inherit it.
+  const sel = document.getElementById('f-cat-select');
+  const reserved = ['All', 'Favourites', 'Not Assigned'];
+  if (activeCategory && !reserved.includes(activeCategory)) {
+    const options = [...sel.options].map(o => o.value);
+    if (options.includes(activeCategory)) {
+      sel.value = activeCategory;
+    } else {
+      catMode = 'input';
+      document.getElementById('cat-select-row').style.display = 'none';
+      document.getElementById('cat-input-row').style.display = '';
+      document.getElementById('cat-mode-toggle').textContent = '(pick existing)';
+      document.getElementById('f-cat-input').value = activeCategory;
+    }
+  }
+
   document.getElementById('overlay').classList.add('open');
 
   // Pre-fill URL from clipboard if it contains a valid link.

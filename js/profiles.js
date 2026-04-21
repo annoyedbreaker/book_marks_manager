@@ -86,6 +86,46 @@ function deleteProfile(id) {
   renderProfileModal();
 }
 
+// ── Copy local storage up to Google Drive (on demand) ────────────────────
+async function copyLocalToDrive() {
+  const statusEl = document.getElementById('copy-to-drive-status');
+  const btn      = document.getElementById('btn-copy-to-drive');
+  const setStatus = (msg, isErr) => {
+    if (!statusEl) return;
+    statusEl.textContent = msg;
+    statusEl.classList.toggle('err', !!isErr);
+  };
+
+  if (getActiveBackendKind() !== 'local') { setStatus('Already on Drive.'); return; }
+  if (!confirm('Copy all local profiles up to your Google Drive? Existing Drive files with the same name will be overwritten.')) return;
+
+  if (btn) btn.disabled = true;
+  setStatus('Signing in…');
+
+  if (!driveIsSignedIn()) {
+    const ok = await driveSignIn();
+    if (!ok) { setStatus('Sign-in cancelled.', true); if (btn) btn.disabled = false; return; }
+  }
+
+  try {
+    setStatus('Copying…');
+    let count = 0;
+    const names = await LocalBackend.listProfileFiles();
+    for (const n of names) {
+      const data = await LocalBackend.readProfileFile(n);
+      if (data) { await DriveBackend.writeProfileFile(n, data); count++; }
+    }
+    const order = await LocalBackend.readOrderFile();
+    if (order) await DriveBackend.writeOrderFile(order);
+    setStatus(`✓ Copied ${count} profile${count !== 1 ? 's' : ''} to Drive.`);
+  } catch (e) {
+    console.error(e);
+    setStatus('Copy failed. Check console.', true);
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
 // ── Change storage backend ────────────────────────────────────────────────
 // Offers the user a choice between re-picking the local folder or switching to Drive.
 async function changeDataFolder() {
@@ -419,8 +459,8 @@ function confirmDeleteProfile(id) {
 
 function renderProfileModal() {
   const folderEl = document.getElementById('profile-folder-info');
+  const kind = getActiveBackendKind();
   if (folderEl) {
-    const kind = getActiveBackendKind();
     if (kind === 'drive') {
       const em = driveUserEmail();
       folderEl.textContent = em ? `Google Drive (${em})` : 'Google Drive';
@@ -428,6 +468,10 @@ function renderProfileModal() {
       folderEl.textContent = getFolderName() || '(none)';
     }
   }
+  const copyBtn = document.getElementById('btn-copy-to-drive');
+  if (copyBtn) copyBtn.style.display = kind === 'local' ? '' : 'none';
+  const copyStatus = document.getElementById('copy-to-drive-status');
+  if (copyStatus) copyStatus.textContent = '';
 
   // Populate ChromeProfile selector
   const cpSelect = document.getElementById('cp-select');

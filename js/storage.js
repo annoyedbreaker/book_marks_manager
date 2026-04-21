@@ -69,8 +69,10 @@ async function loadProfiles() {
   const names = await listProfileFiles();
   chromeProfiles = [];
 
-  for (const name of names) {
-    const data = await readProfileFile(name);
+  // Fetch all profile files in parallel — on Drive this cuts load time roughly Nx.
+  const results = await Promise.all(names.map(n => readProfileFile(n).then(d => [n, d])));
+
+  for (const [name, data] of results) {
     if (!data) continue;
 
     // Old format (no 'profiles' array at root) → discard and delete file.

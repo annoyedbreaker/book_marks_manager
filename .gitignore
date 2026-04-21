@@ -1,0 +1,17 @@
+# Personal bookmark data — never commit
+*.json
+profile_storage/
+profile_storeage/
+bookmarks/
+chrome_bookmars/
+ChromeProfiles.md
+_tools/
+
+# OS / editor junk
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Node (in case _tools/ grows deps)
+node_modules/

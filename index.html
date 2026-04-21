@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>My Bookmarks</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+<!-- Header -->
+<header>
+  <h1>Bookmarks <span>Dashboard</span></h1>
+  <div class="header-actions">
+    <div class="profile-controls">
+      <div class="profile-switcher-wrap">
+        <button id="btn-profile-name" class="btn-profile-name" onclick="toggleProfileDropdown(event)">Profile &#9662;</button>
+        <div id="profile-dropdown" class="profile-dropdown"></div>
+      </div>
+      <button class="btn-profile-edit" onclick="openProfileModal()" title="Edit profiles">&#x270e;</button>
+    </div>
+    <button class="btn-add" onclick="openModal()">+ Add Bookmark</button>
+  </div>
+</header>
+
+<!-- Modal -->
+<div class="overlay" id="overlay">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div class="modal-header">
+      <h2 id="modal-title">Add Bookmark</h2>
+      <button class="btn-close" onclick="closeModal()" aria-label="Close">&times;</button>
+    </div>
+
+    <form id="bookmark-form" novalidate onsubmit="handleSubmit(event)">
+      <div class="form-group">
+        <label for="f-title">Title</label>
+        <input type="text" id="f-title" placeholder="e.g. MDN Web Docs" />
+        <div class="field-error" id="err-title">Please enter a title.</div>
+      </div>
+
+      <div class="form-group">
+        <label for="f-url">URL</label>
+        <input type="url" id="f-url" placeholder="https://example.com" />
+        <div class="field-error" id="err-url">Please enter a valid URL.</div>
+      </div>
+
+      <div class="form-group">
+        <label for="f-cat-select">
+          Category
+          <span id="cat-mode-toggle" class="cat-toggle" onclick="toggleCatMode()">(or type a new one)</span>
+        </label>
+        <div class="category-row" id="cat-select-row">
+          <select id="f-cat-select"></select>
+        </div>
+        <div class="category-row" id="cat-input-row" style="display:none">
+          <input type="text" id="f-cat-input" placeholder="e.g. Research" />
+        </div>
+        <div class="field-error" id="err-cat">Please enter a category.</div>
+      </div>
+
+      <div class="form-group">
+        <label for="f-notes">Notes <span>(optional)</span></label>
+        <textarea id="f-notes" rows="3" placeholder="Why is this bookmark useful?"></textarea>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn-secondary" onclick="closeModal()">Cancel</button>
+        <button type="submit" class="btn-primary" id="btn-submit">Save Bookmark</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- First-run overlay — shown when no storage backend has been chosen yet -->
+<div id="first-run" class="first-run-overlay" style="display:none">
+  <div class="first-run-panel">
+    <h2>Choose Where to Store Your Bookmarks</h2>
+    <p>Your data stays in your own hands either way — nothing is sent to a third-party server.</p>
+
+    <div class="storage-choice">
+      <div class="storage-option">
+        <h3>☁ Google Drive <span class="badge-recommended">Recommended</span></h3>
+        <p class="first-run-hint">Stored in your own Drive (hidden app folder). Syncs across devices. Requires Google sign-in.</p>
+        <button class="btn-primary" onclick="handleDriveSignIn()">Sign in with Google</button>
+      </div>
+      <div class="storage-option">
+        <h3>📁 Local folder</h3>
+        <p class="first-run-hint">Stored as <code>.json</code> files on this computer. No sync, but no account needed.</p>
+        <button class="btn-secondary" onclick="handleChooseFolder()">Choose Folder</button>
+      </div>
+    </div>
+
+    <div class="field-error" id="first-run-err"></div>
+  </div>
+</div>
+
+<!-- Reconnect overlay — shown when the previously used backend needs a user gesture to resume -->
+<div id="reconnect" class="first-run-overlay" style="display:none">
+  <div class="first-run-panel">
+    <h2 id="reconnect-title">Reconnect to Storage</h2>
+    <p id="reconnect-msg">Reconnecting…</p>
+    <p class="first-run-hint" id="reconnect-hint"></p>
+    <button class="btn-primary" id="reconnect-btn" onclick="handleReconnect()">Reconnect</button>
+    <div class="field-error" id="reconnect-err"></div>
+  </div>
+</div>
+
+<!-- Profile Modal -->
+<div id="profile-modal" class="overlay" onclick="profileOverlayClick(event)" style="display:none">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="profile-modal-title">
+    <div class="modal-header">
+      <h2 id="profile-modal-title">Profiles</h2>
+      <button class="btn-close" onclick="closeProfileModal()" aria-label="Close">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="profile-folder-row">
+        <span class="profile-folder-label">Storage:</span>
+        <span id="profile-folder-info" class="profile-folder-name"></span>
+        <button class="btn-profile-action" onclick="changeDataFolder()">Change&hellip;</button>
+      </div>
+      <div class="profile-folder-row cp-select-row">
+        <span class="profile-folder-label">Chrome Profile:</span>
+        <select id="cp-select" class="cp-select" onchange="switchChromeProfile(this.value)"></select>
+      </div>
+      <hr class="profile-divider" />
+      <div id="profile-list"></div>
+      <div class="modal-footer">
+        <button type="button" class="btn-secondary" onclick="closeProfileModal()">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Main -->
+<main>
+  <div class="controls">
+    <div class="search-wrap">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+      </svg>
+      <input type="text" id="search" placeholder="Search bookmarks by title or category…" oninput="renderBookmarks()" />
+    </div>
+    <div class="pills" id="pills"></div>
+  </div>
+
+  <div class="count" id="count"></div>
+  <div class="grid" id="grid"></div>
+</main>
+
+<!-- Google Identity Services (loaded async; app.js waits if needed) -->
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+
+<!-- Scripts — order matters: each file depends on those above it -->
+<script src="js/utils.js"></script>
+<script src="js/state.js"></script>
+<script src="js/filestore.js"></script>
+<script src="js/drivestore.js"></script>
+<script src="js/storage.js"></script>
+<script src="js/render.js"></script>
+<script src="js/actions.js"></script>
+<script src="js/modal.js"></script>
+<script src="js/profiles.js"></script>
+<script src="js/categories.js"></script>
+<script src="js/app.js"></script>
+
+</body>
+</html>

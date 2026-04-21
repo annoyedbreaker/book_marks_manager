@@ -11,11 +11,39 @@ const DRIVE_SCOPE      = 'https://www.googleapis.com/auth/drive.appdata';
 const DRIVE_API        = 'https://www.googleapis.com/drive/v3';
 const DRIVE_UPLOAD     = 'https://www.googleapis.com/upload/drive/v3';
 
+const TOKEN_CACHE_KEY = 'bm_drive_token';
+
 let _tokenClient   = null;
 let _accessToken   = null;
 let _tokenExpiry   = 0;      // epoch ms
 let _idCache       = {};     // { filename: driveFileId }
 let _userEmail     = '';     // for display only
+
+// Restore a cached token from localStorage if it's still valid.
+(function _hydrateCachedToken() {
+  try {
+    const raw = localStorage.getItem(TOKEN_CACHE_KEY);
+    if (!raw) return;
+    const { access_token, expiry, email } = JSON.parse(raw);
+    if (!access_token || !expiry || Date.now() >= expiry) {
+      localStorage.removeItem(TOKEN_CACHE_KEY);
+      return;
+    }
+    _accessToken = access_token;
+    _tokenExpiry = expiry;
+    _userEmail   = email || '';
+  } catch {}
+})();
+
+function _cacheToken() {
+  try {
+    localStorage.setItem(TOKEN_CACHE_KEY, JSON.stringify({
+      access_token: _accessToken,
+      expiry:       _tokenExpiry,
+      email:        _userEmail,
+    }));
+  } catch {}
+}
 
 // ── GIS token handling ────────────────────────────────────────────────────
 
@@ -40,6 +68,7 @@ function _requestToken(interactive) {
       if (resp.error || !resp.access_token) { resolve(null); return; }
       _accessToken = resp.access_token;
       _tokenExpiry = Date.now() + (resp.expires_in || 3600) * 1000 - 60000;
+      _cacheToken();
       resolve(resp.access_token);
     };
     try {
@@ -128,12 +157,15 @@ async function _multipartUpload(filename, body, fileId) {
 // Try silent auth (no popup). Returns 'granted' | 'needs-signin' | 'none'.
 // 'none' means GIS script isn't loaded; 'needs-signin' means a user gesture is required.
 async function driveRestore() {
+  // Cached token still valid → skip Google entirely, no popup.
+  if (_accessToken && Date.now() < _tokenExpiry) return 'granted';
+
   if (!window.google?.accounts?.oauth2) return 'none';
   const prev = localStorage.getItem('bm_drive_last_signin');
   if (!prev) return 'needs-signin';
   const tok = await _requestToken(false);
   if (!tok) return 'needs-signin';
-  await _loadUserEmail();
+  if (!_userEmail) await _loadUserEmail();
   return 'granted';
 }
 
@@ -155,6 +187,7 @@ function driveSignOut() {
   _idCache = {};
   _userEmail = '';
   localStorage.removeItem('bm_drive_last_signin');
+  localStorage.removeItem(TOKEN_CACHE_KEY);
 }
 
 function driveIsSignedIn() { return !!_accessToken; }
@@ -166,6 +199,7 @@ async function _loadUserEmail() {
     if (!resp.ok) return;
     const { user } = await resp.json();
     _userEmail = user?.emailAddress || '';
+    _cacheToken();
   } catch {}
 }
 
